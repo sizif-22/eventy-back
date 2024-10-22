@@ -344,7 +344,7 @@ async function storeMessage(message, eventId, date) {
 }
 
 // API endpoint
-app.post("/api/event", async (req, res) => {
+app.get("/api/event", async (req, res) => {
   console.log("\nReceived event data:", req.body);
 
   const { date, id, message } = req.body;
