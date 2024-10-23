@@ -145,10 +145,10 @@ async function sendMessage(messageId, eventId, content) {
       throw new Error(`Event ${eventId} not found`);
     }
 
-    // Get all documents from the joined collection
+    // Get all documents from the participants collection
     const joinedCollectionRef = collection(
       doc(db, "events", eventId),
-      "joined"
+      "participants"
     );
     const joinedSnapshot = await getDocs(joinedCollectionRef);
 
