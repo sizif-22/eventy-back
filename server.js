@@ -314,18 +314,57 @@ async function loadUnsentMessages() {
     console.error("Error loading unsent messages:", error);
   }
 }
-async function updateEvent(id, messageId) {
+async function updateEvent(eventId, messageId) {
+  if (!eventId || !messageId) {
+    throw new Error("Event ID and Message ID are required");
+  }
+
   try {
-    // Get a reference to the document using its ID
-    const docRef = doc(db, "events", id);
+    // Get a reference to the event document
+    const eventRef = doc(db, "events", eventId);
+    
+    // First get the current document data
+    const eventDoc = await getDoc(eventRef);
+    
+    if (!eventDoc.exists()) {
+      throw new Error(`Event with ID ${eventId} not found`);
+    }
 
-    // Update the document with the new data
-    let messages = [...docRef.messages, messageId];
-    await updateDoc(docRef, { messages });
-
-    return { success: true, message: "Document updated successfully" };
+    const eventData = eventDoc.data();
+    
+    // Initialize messages array if it doesn't exist
+    const currentMessages = eventData.messages || [];
+    
+    // Add the new message ID if it's not already present
+    if (!currentMessages.includes(messageId)) {
+      const updatedMessages = [...currentMessages, messageId];
+      
+      // Update the document with the new messages array
+      await updateDoc(eventRef, { 
+        messages: updatedMessages,
+        lastUpdated: Timestamp.now()
+      });
+      
+      console.log(`Successfully updated event ${eventId} with message ${messageId}`);
+      return {
+        success: true,
+        eventId,
+        messageId,
+        messageCount: updatedMessages.length
+      };
+    } else {
+      console.log(`Message ${messageId} already exists in event ${eventId}`);
+      return {
+        success: true,
+        eventId,
+        messageId,
+        messageCount: currentMessages.length,
+        note: 'Message ID already existed in event'
+      };
+    }
   } catch (error) {
-    return { success: false, message: error.message };
+    console.error(`Error updating event ${eventId}:`, error);
+    throw error; // Propagate error to be handled by the calling function
   }
 }
 
@@ -361,13 +400,13 @@ async function storeMessage(message, eventId, date) {
 app.post("/api/event", async (req, res) => {
   console.log("\nReceived event data:", req.body);
 
-  const { date, id, message } = req.body;
+  const { date, id: eventId, message } = req.body;
 
-  if (!date || !id || !message) {
+  if (!date || !eventId || !message) {
     return res.status(400).json({
       error: "Missing required fields",
       required: ["date", "id", "message"],
-      received: { date, id, message },
+      received: { date, eventId, message },
     });
   }
 
@@ -389,14 +428,13 @@ app.post("/api/event", async (req, res) => {
     const normalizedDate = parsedDate.format();
 
     // Store the message first
-    const messageId = await storeMessage(message, id, normalizedDate);
+    const messageId = await storeMessage(message, eventId, normalizedDate);
 
     // Check if the date is in the past
     if (parsedDate.isBefore(currentDate)) {
       console.log("Date is in the past, sending immediately...");
       try {
-        await sendMessage(messageId, id, message);
-        /*saving the id in the event messages array*/
+        await sendMessage(messageId, eventId, message);
         await updateEvent(eventId, messageId);
         return res.json({
           success: true,
@@ -417,7 +455,10 @@ app.post("/api/event", async (req, res) => {
     }
 
     // If date is in the future, schedule it
-    scheduleMessage(messageId, id, message, normalizedDate);
+    scheduleMessage(messageId, eventId, message, normalizedDate);
+    
+    // Update the event with the new message ID
+    await updateEvent(eventId, messageId);
 
     res.json({
       success: true,
