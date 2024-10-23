@@ -314,6 +314,20 @@ async function loadUnsentMessages() {
     console.error("Error loading unsent messages:", error);
   }
 }
+async function updateEvent(id, messageId) {
+  try {
+    // Get a reference to the document using its ID
+    const docRef = doc(db, "events", id);
+
+    // Update the document with the new data
+    let messages = [...docRef.messages, messageId];
+    await updateDoc(docRef, { messages });
+
+    return { success: true, message: "Document updated successfully" };
+  } catch (error) {
+    return { success: false, message: error.message };
+  }
+}
 
 async function storeMessage(message, eventId, date) {
   try {
@@ -382,6 +396,8 @@ app.post("/api/event", async (req, res) => {
       console.log("Date is in the past, sending immediately...");
       try {
         await sendMessage(messageId, id, message);
+        /*saving the id in the event messages array*/
+        await updateEvent(eventId, messageId);
         return res.json({
           success: true,
           message: "Message sent immediately",
