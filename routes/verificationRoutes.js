@@ -198,11 +198,6 @@ router.post(
       );
       const newParticipantRef = doc(participantsRef);
 
-    //   await setDoc(newParticipantRef, {
-    //     ...participantData,
-    //     joinedAt: Timestamp.now(),
-    //   });
-
       // Delete pending document
       await deleteDoc(pendingDocRef);
 

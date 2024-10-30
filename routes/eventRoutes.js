@@ -8,9 +8,12 @@ const {
 } = require("../services/messageService");
 const { updateEvent } = require("../services/eventService");
 
-router.post("/event", async (req, res) => {
-  console.log("\nReceived event data:", req.body);
+// Define constants
+const TIMEZONE = process.env.TIMEZONE || 'Africa/Cairo';
+const MAX_MESSAGE_LENGTH = 1000; // Example limit
 
+// Validation middleware
+const validateEventRequest = (req, res, next) => {
   const { date, id: eventId, message } = req.body;
 
   if (!date || !eventId || !message) {
@@ -20,6 +23,21 @@ router.post("/event", async (req, res) => {
       received: { date, eventId, message },
     });
   }
+
+  if (message.length > MAX_MESSAGE_LENGTH) {
+    return res.status(400).json({
+      error: "Message too long",
+      maxLength: MAX_MESSAGE_LENGTH,
+      receivedLength: message.length
+    });
+  }
+
+  next();
+};
+
+router.post("/event", validateEventRequest, async (req, res) => {
+  console.log("\nReceived event data:", req.body);
+  const { date, id: eventId, message } = req.body;
 
   try {
     console.log("Validating date:", date);
@@ -38,54 +56,67 @@ router.post("/event", async (req, res) => {
 
     const normalizedDate = parsedDate.format();
 
-    // Store the message first
-    const messageId = await storeMessage(message, eventId, normalizedDate);
+    try {
+      // Use a transaction or atomic operation if your database supports it
+      const messageId = await storeMessage(message, eventId, normalizedDate);
+      await updateEvent(eventId, messageId);
 
-    // Check if the date is in the past
-    if (parsedDate.isBefore(currentDate)) {
-      console.log("Date is in the past, sending immediately...");
+      // Check if the date is in the past
+      if (parsedDate.isBefore(currentDate)) {
+        console.log("Date is in the past, sending immediately...");
+        try {
+          await sendMessage(messageId, eventId, message);
+          return res.json({
+            success: true,
+            message: "Message sent immediately",
+            messageId,
+            originalDate: date,
+            normalizedDate,
+            timezone: TIMEZONE,
+            sentImmediately: true,
+          });
+        } catch (sendError) {
+          // Log the error but don't expose internal error details to client
+          console.error("Failed to send message:", sendError);
+          return res.status(500).json({
+            error: "Failed to send message immediately",
+            messageId,
+          });
+        }
+      }
+
+      // If date is in the future, schedule it
       try {
-        await sendMessage(messageId, eventId, message);
-        await updateEvent(eventId, messageId);
-        return res.json({
+        await scheduleMessage(messageId, eventId, message, normalizedDate);
+        res.json({
           success: true,
-          message: "Message sent immediately",
+          message: "Event scheduled successfully",
+          scheduledFor: parsedDate.format(),
           messageId,
           originalDate: date,
-          normalizedDate: normalizedDate,
+          normalizedDate,
           timezone: TIMEZONE,
-          sentImmediately: true,
+          sentImmediately: false,
         });
-      } catch (sendError) {
+      } catch (scheduleError) {
+        console.error("Failed to schedule message:", scheduleError);
         return res.status(500).json({
-          error: "Failed to send message immediately",
-          details: sendError.message,
+          error: "Failed to schedule message",
           messageId,
         });
       }
+    } catch (dbError) {
+      console.error("Database operation failed:", dbError);
+      return res.status(500).json({
+        error: "Failed to process event",
+        details: "Database operation failed",
+      });
     }
-
-    // If date is in the future, schedule it
-    scheduleMessage(messageId, eventId, message, normalizedDate);
-
-    // Update the event with the new message ID
-    await updateEvent(eventId, messageId);
-
-    res.json({
-      success: true,
-      message: "Event scheduled successfully",
-      scheduledFor: parsedDate.format(),
-      messageId,
-      originalDate: date,
-      normalizedDate: normalizedDate,
-      timezone: TIMEZONE,
-      sentImmediately: false,
-    });
   } catch (error) {
     console.error("Error handling event:", error);
     res.status(500).json({
       error: "Failed to process event",
-      details: error.message,
+      details: "Internal server error",
     });
   }
 });
