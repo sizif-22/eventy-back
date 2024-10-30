@@ -1,10 +1,21 @@
-const { collection, doc, getDoc, getDocs, updateDoc, addDoc, query, where, Timestamp } = require("firebase/firestore");
+const {
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  updateDoc,
+  addDoc,
+  query,
+  where,
+  Timestamp,
+} = require("firebase/firestore");
 const cron = require("node-cron");
 const { db } = require("../config/firebase");
 const { transporter } = require("../config/email");
-const { parseDate, TIMEZONE } = require("../utils/dateUtils");
+const { parseDate,getCairoNow, TIMEZONE } = require("../utils/dateUtils");
 
 const activeJobs = new Map();
+
 
 async function sendMessage(messageId, eventId, content) {
   try {
@@ -13,7 +24,10 @@ async function sendMessage(messageId, eventId, content) {
       throw new Error(`Event ${eventId} not found`);
     }
 
-    const joinedCollectionRef = collection(doc(db, "events", eventId), "participants");
+    const joinedCollectionRef = collection(
+      doc(db, "events", eventId),
+      "participants"
+    );
     const joinedSnapshot = await getDocs(joinedCollectionRef);
 
     const emails = [];
@@ -191,7 +205,6 @@ async function storeMessage(message, eventId, date) {
     throw error;
   }
 }
-
 
 module.exports = {
   sendMessage,
