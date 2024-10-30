@@ -160,61 +160,52 @@ router.post(
     try {
       const { documentId, code, eventId } = req.body;
 
-      // Updated path to access pendingParticipants as a subcollection
-      const pendingDoc = await getDoc(
-        doc(db, "events", eventId, "pendingParticipants", documentId)
-      );
+      // Use a transaction to ensure atomicity
+      await runTransaction(db, async (transaction) => {
+        // Get the pending document
+        const pendingDocRef = doc(db, "events", eventId, "pendingParticipants", documentId);
+        const pendingDoc = await transaction.get(pendingDocRef);
 
-      if (!pendingDoc.exists()) {
-        return res
-          .status(404)
-          .json({ error: "Verification expired or not found" });
-      }
+        if (!pendingDoc.exists()) {
+          throw new Error("Verification expired or not found");
+        }
 
-      const pendingData = pendingDoc.data();
+        const pendingData = pendingDoc.data();
 
-      if (pendingData.verificationCode !== code) {
-        return res.status(400).json({ error: "Invalid verification code" });
-      }
+        if (pendingData.verificationCode !== code) {
+          throw new Error("Invalid verification code");
+        }
 
-      const createdAt = pendingData.createdAt.toDate();
-      if (!isWithinMinutes(createdAt, 10)) {
-        // Updated delete path
-        await deleteDoc(
-          doc(db, "events", eventId, "pendingParticipants", documentId)
+        const createdAt = pendingData.createdAt.toDate();
+        if (!isWithinMinutes(createdAt, 10)) {
+          // Will be deleted in the transaction below
+          throw new Error("Verification code expired");
+        }
+
+        // Check for existing registration using the email
+        const email = pendingData["0"];
+        const participantsRef = collection(
+          doc(db, "events", eventId),
+          "participants"
         );
-        return res.status(400).json({ error: "Verification code expired" });
-      }
+        const participantsQuery = query(participantsRef, where("0", "==", email));
+        const existingParticipantDocs = await transaction.get(participantsQuery);
 
-      // Double-check email registration
-      const email = pendingData["0"];
-      const participantsRef = collection(
-        doc(db, "events", eventId),
-        "participants"
-      );
-      const participantsQuery = query(participantsRef, where("0", "==", email));
-      const existingParticipant = await getDocs(participantsQuery);
+        if (!existingParticipantDocs.empty) {
+          throw new Error("Email already registered");
+        }
 
-      if (!existingParticipant.empty) {
-        // Updated delete path
-        await deleteDoc(
-          doc(db, "events", eventId, "pendingParticipants", documentId)
-        );
-        return res.status(400).json({ error: "Email already registered" });
-      }
-
-      // Move to participants collection
-      const { verificationCode, ...participantData } = pendingData;
-      const newParticipantRef = doc(participantsRef);
-      await setDoc(newParticipantRef, {
-        ...participantData,
-        joinedAt: Timestamp.now(),
+        // If we get here, we can safely add the participant
+        const { verificationCode, ...participantData } = pendingData;
+        const newParticipantRef = doc(participantsRef);
+        
+        // Add new participant and delete pending document in the transaction
+        transaction.set(newParticipantRef, {
+          ...participantData,
+          joinedAt: Timestamp.now(),
+        });
+        transaction.delete(pendingDocRef);
       });
-
-      // Updated delete path
-      await deleteDoc(
-        doc(db, "events", eventId, "pendingParticipants", documentId)
-      );
 
       res.json({
         success: true,
@@ -222,9 +213,15 @@ router.post(
       });
     } catch (error) {
       console.error("Error confirming verification:", error);
-      res.status(500).json({
-        error: "Failed to confirm verification",
-        details: error.message,
+      
+      // Provide more specific error messages based on the error type
+      const errorMessage = error.message.includes("Error:") 
+        ? error.message 
+        : "Failed to confirm verification";
+        
+      res.status(error.message.includes("Error:") ? 400 : 500).json({
+        error: errorMessage,
+        details: error.message
       });
     }
   }
