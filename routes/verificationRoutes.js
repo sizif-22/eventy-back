@@ -7,28 +7,53 @@ const {
   collection,
   deleteDoc,
   query,
+  getDocs,
+  where,
+  setDoc,
 } = require("firebase/firestore");
 const { db } = require("../config/firebase");
+const { transporter } = require("../config/email");
+const { isWithinMinutes } = require("../utils/dateUtils");
 
-router.post("/verify-email", async (req, res) => {
+// Validation middleware
+const validateEmailRequest = (req, res, next) => {
+  const { email, eventId } = req.body;
+  if (!email || !eventId) {
+    return res.status(400).json({ error: "Email and event ID are required" });
+  }
+  next();
+};
+
+const validateVerificationRequest = (req, res, next) => {
   const { documentId } = req.body;
-
   if (!documentId) {
     return res.status(400).json({ error: "Document ID is required" });
   }
+  next();
+};
 
+const validateConfirmationRequest = (req, res, next) => {
+  const { documentId, code, eventId } = req.body;
+  if (!documentId || !code || !eventId) {
+    return res.status(400).json({ error: "Missing required fields" });
+  }
+  next();
+};
+
+// Route handlers
+router.post("/verify-email", validateVerificationRequest, async (req, res) => {
   try {
-    // Get the pending participant document
+    const { documentId } = req.body;
+    
     const pendingDoc = await getDoc(doc(db, "pendingParticipants", documentId));
     if (!pendingDoc.exists()) {
       return res.status(404).json({ error: "Document not found" });
     }
 
     const pendingData = pendingDoc.data();
-    const email = pendingData["0"]; // Email is stored in field "0"
+    const email = pendingData["0"];
     const verificationCode = pendingData.verificationCode;
 
-    // Send verification email
     await transporter.sendMail({
       from: process.env.EMAIL_FROM || "hello@web-events-two.vercel.app",
       to: email,
@@ -50,7 +75,7 @@ router.post("/verify-email", async (req, res) => {
     res.json({
       success: true,
       message: "Verification code sent",
-      email: email, // Send back email for UI feedback
+      email,
     });
   } catch (error) {
     console.error("Error sending verification code:", error);
@@ -61,19 +86,12 @@ router.post("/verify-email", async (req, res) => {
   }
 });
 
-router.post("/check-email", async (req, res) => {
-  const { email, eventId } = req.body;
-
-  if (!email || !eventId) {
-    return res.status(400).json({ error: "Email and event ID are required" });
-  }
-
+router.post("/check-email", validateEmailRequest, async (req, res) => {
   try {
+    const { email, eventId } = req.body;
+    
     // Check participants collection
-    const participantsRef = collection(
-      doc(db, "events", eventId),
-      "participants"
-    );
+    const participantsRef = collection(doc(db, "events", eventId), "participants");
     const participantsQuery = query(participantsRef, where("0", "==", email));
     const existingParticipant = await getDocs(participantsQuery);
 
@@ -91,13 +109,10 @@ router.post("/check-email", async (req, res) => {
     const existingPending = await getDocs(pendingQuery);
 
     if (!existingPending.empty) {
-      // Get the creation time of the pending document
       const pendingData = existingPending.docs[0].data();
       const createdAt = pendingData.createdAt.toDate();
-      const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000);
-
-      // If the document is older than 10 minutes, delete it
-      if (createdAt < tenMinutesAgo) {
+      
+      if (!isWithinMinutes(createdAt, 10)) {
         await deleteDoc(existingPending.docs[0].ref);
         return res.json({
           exists: false,
@@ -125,43 +140,30 @@ router.post("/check-email", async (req, res) => {
   }
 });
 
-router.post("/confirm-verification", async (req, res) => {
-  const { documentId, code, eventId } = req.body;
-
-  if (!documentId || !code || !eventId) {
-    return res.status(400).json({ error: "Missing required fields" });
-  }
-
+router.post("/confirm-verification", validateConfirmationRequest, async (req, res) => {
   try {
-    // Get the pending document
+    const { documentId, code, eventId } = req.body;
+    
     const pendingDoc = await getDoc(doc(db, "pendingParticipants", documentId));
     if (!pendingDoc.exists()) {
-      return res
-        .status(404)
-        .json({ error: "Verification expired or not found" });
+      return res.status(404).json({ error: "Verification expired or not found" });
     }
 
     const pendingData = pendingDoc.data();
 
-    // Check if code matches
     if (pendingData.verificationCode !== code) {
       return res.status(400).json({ error: "Invalid verification code" });
     }
 
-    // Check if document is not expired (10 minutes)
     const createdAt = pendingData.createdAt.toDate();
-    const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000);
-    if (createdAt < tenMinutesAgo) {
+    if (!isWithinMinutes(createdAt, 10)) {
       await deleteDoc(doc(db, "pendingParticipants", documentId));
       return res.status(400).json({ error: "Verification code expired" });
     }
 
-    // Check if email already exists in participants (double-check)
+    // Double-check email registration
     const email = pendingData["0"];
-    const participantsRef = collection(
-      doc(db, "events", eventId),
-      "participants"
-    );
+    const participantsRef = collection(doc(db, "events", eventId), "participants");
     const participantsQuery = query(participantsRef, where("0", "==", email));
     const existingParticipant = await getDocs(participantsQuery);
 
@@ -170,7 +172,7 @@ router.post("/confirm-verification", async (req, res) => {
       return res.status(400).json({ error: "Email already registered" });
     }
 
-    // Move data to participants collection
+    // Move to participants collection
     const { verificationCode, ...participantData } = pendingData;
     const newParticipantRef = doc(participantsRef);
     await setDoc(newParticipantRef, {
@@ -178,7 +180,6 @@ router.post("/confirm-verification", async (req, res) => {
       joinedAt: Timestamp.now(),
     });
 
-    // Delete pending document
     await deleteDoc(doc(db, "pendingParticipants", documentId));
 
     res.json({
