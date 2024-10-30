@@ -1,5 +1,6 @@
 const express = require("express");
 const router = express.Router();
+const { doc, getDoc, Timestamp } = require("firebase/firestore");
 
 router.post("/verify-email", async (req, res) => {
   const { documentId } = req.body;
