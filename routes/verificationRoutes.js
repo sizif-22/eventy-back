@@ -160,56 +160,51 @@ router.post(
     try {
       const { documentId, code, eventId } = req.body;
 
-      // Create a new batch
-      const batch = writeBatch(db);
-
-      // Get the pending document
-      const pendingDocRef = doc(db, "events", eventId, "pendingParticipants", documentId);
+      // Get pending document
+      const pendingDocRef = doc(
+        db,
+        "events",
+        eventId,
+        "pendingParticipants",
+        documentId
+      );
       const pendingDoc = await getDoc(pendingDocRef);
 
       if (!pendingDoc.exists()) {
-        return res.status(404).json({ error: "Verification expired or not found" });
+        return res
+          .status(404)
+          .json({ error: "Verification expired or not found" });
       }
 
       const pendingData = pendingDoc.data();
 
+      // Validate verification code
       if (pendingData.verificationCode !== code) {
         return res.status(400).json({ error: "Invalid verification code" });
       }
 
+      // Check if code is expired
       const createdAt = pendingData.createdAt.toDate();
       if (!isWithinMinutes(createdAt, 10)) {
         await deleteDoc(pendingDocRef);
         return res.status(400).json({ error: "Verification code expired" });
       }
 
-      // Check for existing registration using the email
-      const email = pendingData["0"];
+      // Move to participants collection
+      const { verificationCode, ...participantData } = pendingData;
       const participantsRef = collection(
         doc(db, "events", eventId),
         "participants"
       );
-      const participantsQuery = query(participantsRef, where("0", "==", email));
-      const existingParticipant = await getDocs(participantsQuery);
-
-      if (!existingParticipant.empty) {
-        await deleteDoc(pendingDocRef);
-        return res.status(400).json({ error: "Email already registered" });
-      }
-
-      // If we get here, we can safely add the participant
-      const { verificationCode, ...participantData } = pendingData;
       const newParticipantRef = doc(participantsRef);
 
-      // Add operations to batch
-      batch.set(newParticipantRef, {
+      await setDoc(newParticipantRef, {
         ...participantData,
         joinedAt: Timestamp.now(),
       });
-      batch.delete(pendingDocRef);
 
-      // Commit the batch
-      await batch.commit();
+      // Delete pending document
+      await deleteDoc(pendingDocRef);
 
       res.json({
         success: true,
