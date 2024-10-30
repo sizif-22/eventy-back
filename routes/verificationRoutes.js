@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 
-app.post("/verify-email", async (req, res) => {
+router.post("/verify-email", async (req, res) => {
   const { documentId } = req.body;
 
   if (!documentId) {
@@ -52,7 +52,7 @@ app.post("/verify-email", async (req, res) => {
   }
 });
 
-app.post("/check-email", async (req, res) => {
+router.post("/check-email", async (req, res) => {
   const { email, eventId } = req.body;
 
   if (!email || !eventId) {
@@ -116,7 +116,7 @@ app.post("/check-email", async (req, res) => {
   }
 });
 
-app.post("/confirm-verification", async (req, res) => {
+router.post("/confirm-verification", async (req, res) => {
   const { documentId, code, eventId } = req.body;
 
   if (!documentId || !code || !eventId) {

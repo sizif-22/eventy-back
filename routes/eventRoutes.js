@@ -8,7 +8,7 @@ const {
 } = require("../services/messageService");
 const { updateEvent } = require("../services/eventService");
 
-app.post("/event", async (req, res) => {
+router.post("/event", async (req, res) => {
   console.log("\nReceived event data:", req.body);
 
   const { date, id: eventId, message } = req.body;
