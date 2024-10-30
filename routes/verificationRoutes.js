@@ -25,9 +25,11 @@ const validateEmailRequest = (req, res, next) => {
 };
 
 const validateVerificationRequest = (req, res, next) => {
-  const { documentId } = req.body;
-  if (!documentId) {
-    return res.status(400).json({ error: "Document ID is required" });
+  const { documentId, eventId } = req.body;
+  if (!documentId || !eventId) {
+    return res
+      .status(400)
+      .json({ error: "Document ID and event ID are required" });
   }
   next();
 };
@@ -43,9 +45,13 @@ const validateConfirmationRequest = (req, res, next) => {
 // Route handlers
 router.post("/verify-email", validateVerificationRequest, async (req, res) => {
   try {
-    const { documentId } = req.body;
-    
-    const pendingDoc = await getDoc(doc(db, "pendingParticipants", documentId));
+    const { documentId, eventId } = req.body;
+
+    // Updated path to access pendingParticipants as a subcollection
+    const pendingDoc = await getDoc(
+      doc(db, "events", eventId, "pendingParticipants", documentId)
+    );
+
     if (!pendingDoc.exists()) {
       return res.status(404).json({ error: "Document not found" });
     }
@@ -89,9 +95,12 @@ router.post("/verify-email", validateVerificationRequest, async (req, res) => {
 router.post("/check-email", validateEmailRequest, async (req, res) => {
   try {
     const { email, eventId } = req.body;
-    
+
     // Check participants collection
-    const participantsRef = collection(doc(db, "events", eventId), "participants");
+    const participantsRef = collection(
+      doc(db, "events", eventId),
+      "participants"
+    );
     const participantsQuery = query(participantsRef, where("0", "==", email));
     const existingParticipant = await getDocs(participantsQuery);
 
@@ -103,16 +112,20 @@ router.post("/check-email", validateEmailRequest, async (req, res) => {
       });
     }
 
-    // Check pending participants
-    const pendingRef = collection(db, "pendingParticipants");
+    // Updated: Check pending participants subcollection
+    const pendingRef = collection(
+      doc(db, "events", eventId),
+      "pendingParticipants"
+    );
     const pendingQuery = query(pendingRef, where("0", "==", email));
     const existingPending = await getDocs(pendingQuery);
 
     if (!existingPending.empty) {
       const pendingData = existingPending.docs[0].data();
       const createdAt = pendingData.createdAt.toDate();
-      
+
       if (!isWithinMinutes(createdAt, 10)) {
+        // Updated delete path
         await deleteDoc(existingPending.docs[0].ref);
         return res.json({
           exists: false,
@@ -140,59 +153,81 @@ router.post("/check-email", validateEmailRequest, async (req, res) => {
   }
 });
 
-router.post("/confirm-verification", validateConfirmationRequest, async (req, res) => {
-  try {
-    const { documentId, code, eventId } = req.body;
-    
-    const pendingDoc = await getDoc(doc(db, "pendingParticipants", documentId));
-    if (!pendingDoc.exists()) {
-      return res.status(404).json({ error: "Verification expired or not found" });
+router.post(
+  "/confirm-verification",
+  validateConfirmationRequest,
+  async (req, res) => {
+    try {
+      const { documentId, code, eventId } = req.body;
+
+      // Updated path to access pendingParticipants as a subcollection
+      const pendingDoc = await getDoc(
+        doc(db, "events", eventId, "pendingParticipants", documentId)
+      );
+
+      if (!pendingDoc.exists()) {
+        return res
+          .status(404)
+          .json({ error: "Verification expired or not found" });
+      }
+
+      const pendingData = pendingDoc.data();
+
+      if (pendingData.verificationCode !== code) {
+        return res.status(400).json({ error: "Invalid verification code" });
+      }
+
+      const createdAt = pendingData.createdAt.toDate();
+      if (!isWithinMinutes(createdAt, 10)) {
+        // Updated delete path
+        await deleteDoc(
+          doc(db, "events", eventId, "pendingParticipants", documentId)
+        );
+        return res.status(400).json({ error: "Verification code expired" });
+      }
+
+      // Double-check email registration
+      const email = pendingData["0"];
+      const participantsRef = collection(
+        doc(db, "events", eventId),
+        "participants"
+      );
+      const participantsQuery = query(participantsRef, where("0", "==", email));
+      const existingParticipant = await getDocs(participantsQuery);
+
+      if (!existingParticipant.empty) {
+        // Updated delete path
+        await deleteDoc(
+          doc(db, "events", eventId, "pendingParticipants", documentId)
+        );
+        return res.status(400).json({ error: "Email already registered" });
+      }
+
+      // Move to participants collection
+      const { verificationCode, ...participantData } = pendingData;
+      const newParticipantRef = doc(participantsRef);
+      await setDoc(newParticipantRef, {
+        ...participantData,
+        joinedAt: Timestamp.now(),
+      });
+
+      // Updated delete path
+      await deleteDoc(
+        doc(db, "events", eventId, "pendingParticipants", documentId)
+      );
+
+      res.json({
+        success: true,
+        message: "Email verified successfully",
+      });
+    } catch (error) {
+      console.error("Error confirming verification:", error);
+      res.status(500).json({
+        error: "Failed to confirm verification",
+        details: error.message,
+      });
     }
-
-    const pendingData = pendingDoc.data();
-
-    if (pendingData.verificationCode !== code) {
-      return res.status(400).json({ error: "Invalid verification code" });
-    }
-
-    const createdAt = pendingData.createdAt.toDate();
-    if (!isWithinMinutes(createdAt, 10)) {
-      await deleteDoc(doc(db, "pendingParticipants", documentId));
-      return res.status(400).json({ error: "Verification code expired" });
-    }
-
-    // Double-check email registration
-    const email = pendingData["0"];
-    const participantsRef = collection(doc(db, "events", eventId), "participants");
-    const participantsQuery = query(participantsRef, where("0", "==", email));
-    const existingParticipant = await getDocs(participantsQuery);
-
-    if (!existingParticipant.empty) {
-      await deleteDoc(doc(db, "pendingParticipants", documentId));
-      return res.status(400).json({ error: "Email already registered" });
-    }
-
-    // Move to participants collection
-    const { verificationCode, ...participantData } = pendingData;
-    const newParticipantRef = doc(participantsRef);
-    await setDoc(newParticipantRef, {
-      ...participantData,
-      joinedAt: Timestamp.now(),
-    });
-
-    await deleteDoc(doc(db, "pendingParticipants", documentId));
-
-    res.json({
-      success: true,
-      message: "Email verified successfully",
-    });
-  } catch (error) {
-    console.error("Error confirming verification:", error);
-    res.status(500).json({
-      error: "Failed to confirm verification",
-      details: error.message,
-    });
   }
-});
+);
 
 module.exports = router;
