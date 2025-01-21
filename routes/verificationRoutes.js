@@ -198,17 +198,20 @@ router.post(
       );
       const newParticipantRef = doc(participantsRef);
 
+      try {
+        await transporter.sendMail({
+          from: process.env.EMAIL_FROM || "hello@web-events-two.vercel.app",
+          to: email,
+          subject: "Thank Your for joining our Event",
+          text: `Thank Your for joining our Event, This is your QR code for the Event`,
+          html: `<div style="color: red; font-family: sans-serif; font-size: smaller;">Some QR here</div>`,
+        });
+      } catch (error) {
+        console.log("welcomeMSG faild to be sent...");
+      }
+
       // Delete pending document
       await deleteDoc(pendingDocRef);
-
-      await transporter.sendMail({
-        from: process.env.EMAIL_FROM || "hello@web-events-two.vercel.app",
-        to: email,
-        subject: "Thank Your for joining our Event",
-        text: `Thank Your for joining our Event, This is your QR code for the Event`,
-        html: `<div style="color: red; font-family: sans-serif; font-size: smaller;">Some QR here</div>`,
-      });
-
       res.json({
         success: true,
         message: "Email verified successfully",
