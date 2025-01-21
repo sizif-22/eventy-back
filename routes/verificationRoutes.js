@@ -210,7 +210,7 @@ router.post(
 
         // Write participant data to Firestore
         const  joinedAt = serverTimestamp();
-        await setDoc(newParticipantRef,joinedAt, participantData);
+        await setDoc(newParticipantRef,{joinedAt, ...participantData});
       } catch (error) {
         console.error(
           "Failed to send welcome message or save participant:",
