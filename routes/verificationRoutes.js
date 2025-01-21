@@ -14,6 +14,7 @@ const {
 const { db } = require("../config/firebase");
 const { transporter } = require("../config/email");
 const { isWithinMinutes } = require("../utils/dateUtils");
+const { sendQR } = require("../utils/qrUtils");
 
 // Validation middleware
 const validateEmailRequest = (req, res, next) => {
@@ -199,15 +200,9 @@ router.post(
         "participants"
       );
       const newParticipantRef = doc(participantsRef);
-
+      const docId = (await getDoc(newParticipantRef)).id;
       try {
-        await transporter.sendMail({
-          from: process.env.EMAIL_FROM || "hello@web-events-two.vercel.app",
-          to: email,
-          subject: "Thank Your for joining our Event",
-          text: `Thank Your for joining our Event, This is your QR code for the Event`,
-          html: `<div style="color: red; font-family: sans-serif; font-size: smaller;">Some QR here</div>`,
-        });
+        sendQR(email, `${eventId}&&${docId}`);
       } catch (error) {
         console.log("welcomeMSG faild to be sent...");
       }
