@@ -203,9 +203,16 @@ router.post(
 
       const docId = newParticipantRef.id;
       try {
+        // Send QR with eventId and documentId concatenated
         await sendQR(email, `${eventId}&&${docId}`);
+
+        // Write participant data to Firestore
+        await setDoc(newParticipantRef, participantData);
       } catch (error) {
-        console.log("welcomeMSG failed to be sent...");
+        console.error(
+          "Failed to send welcome message or save participant:",
+          error
+        );
       }
 
       // Delete pending document
