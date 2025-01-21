@@ -202,6 +202,9 @@ router.post(
       const newParticipantRef = doc(participantsRef);
       const docId = (await getDoc(newParticipantRef)).id;
       try {
+        console.log(email);
+        console.log(eventId);
+        console.log(docId);
         await sendQR(email, `${eventId}&&${docId}`);
       } catch (error) {
         console.log("welcomeMSG faild to be sent...");
