@@ -200,7 +200,8 @@ router.post(
         "participants"
       );
       const newParticipantRef = doc(participantsRef);
-      const docId = (await getDoc(newParticipantRef)).id;
+
+      const docId = newParticipantRef.id;
       try {
         await sendQR(email, `${eventId}&&${docId}`);
       } catch (error) {
