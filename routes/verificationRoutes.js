@@ -190,13 +190,13 @@ router.post(
 
       // Check if code is expired
       // const createdat = pendingData.createdAt.toDate();
+      const { verificationCode, createdAt, ...participantData } = pendingData;
       if (!isWithinMinutes(createdAt, 10)) {
         await deleteDoc(pendingDocRef);
         return res.status(400).json({ error: "Verification code expired" });
       }
 
       // Move to participants collection
-      const { verificationCode, createdAt, ...participantData } = pendingData;
       const participantsRef = collection(
         doc(db, "events", eventId),
         "participants"
