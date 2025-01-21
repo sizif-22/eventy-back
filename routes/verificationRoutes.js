@@ -14,7 +14,7 @@ const {
 const { db } = require("../config/firebase");
 const { transporter } = require("../config/email");
 const { isWithinMinutes } = require("../utils/dateUtils");
-const { sendQR } = require("../utils/qrUtils");
+const sendQR = require("../utils/qrUtils");
 
 // Validation middleware
 const validateEmailRequest = (req, res, next) => {
@@ -202,12 +202,9 @@ router.post(
       const newParticipantRef = doc(participantsRef);
       const docId = (await getDoc(newParticipantRef)).id;
       try {
-        console.log(email);
-        console.log(eventId);
-        console.log(docId);
         await sendQR(email, `${eventId}&&${docId}`);
       } catch (error) {
-        console.log("welcomeMSG faild to be sent...");
+        console.log("welcomeMSG failed to be sent...");
       }
 
       // Delete pending document
