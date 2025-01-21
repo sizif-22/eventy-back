@@ -1,4 +1,5 @@
 const QRCode = require("qrcode");
+const { transporter } = require("../config/email");
 
 const sendQR = async (email, text) => {
   try {
