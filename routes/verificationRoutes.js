@@ -168,16 +168,15 @@ router.post(
         "pendingParticipants",
         documentId
       );
-      
-      
+
       const pendingDoc = await getDoc(pendingDocRef);
-      
+
       if (!pendingDoc.exists()) {
         return res
-        .status(404)
-        .json({ error: "Verification expired or not found" });
+          .status(404)
+          .json({ error: "Verification expired or not found" });
       }
-      
+
       const pendingData = pendingDoc.data();
       const email = pendingData["0"];
 
@@ -228,5 +227,22 @@ router.post(
     }
   }
 );
+router.delete("/delete-user", async (req, res) => {
+  const { eventId, docId } = req.body;
+  const docRef = doc(db, "events", eventId, "participants", docId);
+  try {
+    await deleteDoc(docRef);
+  } catch (error) {
+    console.error("participant did not get deleted yet");
+    res.status(500).json({
+      success: true,
+      message: "participant did not get deleted yet",
+    });
+  }
+  res.status(200).json({
+    success: true,
+    message: "participant deleted successfully",
+  });
+});
 
 module.exports = router;
