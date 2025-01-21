@@ -8,6 +8,7 @@ const {
   deleteDoc,
   query,
   getDocs,
+  serverTimestamp,
   where,
   setDoc,
 } = require("firebase/firestore");
@@ -15,6 +16,7 @@ const { db } = require("../config/firebase");
 const { transporter } = require("../config/email");
 const { isWithinMinutes } = require("../utils/dateUtils");
 const sendQR = require("../utils/qrUtils");
+
 
 // Validation middleware
 const validateEmailRequest = (req, res, next) => {
@@ -187,14 +189,14 @@ router.post(
       }
 
       // Check if code is expired
-      const createdAt = pendingData.createdAt.toDate();
+      // const createdat = pendingData.createdAt.toDate();
       if (!isWithinMinutes(createdAt, 10)) {
         await deleteDoc(pendingDocRef);
         return res.status(400).json({ error: "Verification code expired" });
       }
 
       // Move to participants collection
-      const { verificationCode, ...participantData } = pendingData;
+      const { verificationCode, createdAt, ...participantData } = pendingData;
       const participantsRef = collection(
         doc(db, "events", eventId),
         "participants"
@@ -207,7 +209,8 @@ router.post(
         await sendQR(email, eventId, docId);
 
         // Write participant data to Firestore
-        await setDoc(newParticipantRef, participantData);
+        const  joinedAt = serverTimestamp();
+        await setDoc(newParticipantRef,joinedAt, participantData);
       } catch (error) {
         console.error(
           "Failed to send welcome message or save participant:",
