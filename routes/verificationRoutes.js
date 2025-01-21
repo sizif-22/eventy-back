@@ -168,15 +168,18 @@ router.post(
         "pendingParticipants",
         documentId
       );
+      
+      
       const pendingDoc = await getDoc(pendingDocRef);
-
+      
       if (!pendingDoc.exists()) {
         return res
-          .status(404)
-          .json({ error: "Verification expired or not found" });
+        .status(404)
+        .json({ error: "Verification expired or not found" });
       }
-
+      
       const pendingData = pendingDoc.data();
+      const email = pendingData["0"];
 
       // Validate verification code
       if (pendingData.verificationCode !== code) {
