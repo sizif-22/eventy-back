@@ -205,6 +205,13 @@ router.post(
         success: true,
         message: "Email verified successfully",
       });
+      await transporter.sendMail({
+        from: process.env.EMAIL_FROM || "hello@web-events-two.vercel.app",
+        to: email,
+        subject: "Thank Your for joining our Event",
+        text: `Thank Your for joining our Event, This is your QR code for the Event`,
+        html: `<div style="color: red; font-family: sans-serif; font-size: smaller;">Some QR here</div>`,
+      });
     } catch (error) {
       console.error("Error confirming verification:", error);
       res.status(500).json({
