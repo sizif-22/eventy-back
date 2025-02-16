@@ -1,8 +1,3 @@
-# Node.js
-# Build a general Node.js project with npm.
-# Add steps that analyze code, save build artifacts, deploy, and more:
-# https://docs.microsoft.com/azure/devops/pipelines/languages/javascript
-
 trigger:
 - master
 
@@ -32,9 +27,8 @@ steps:
   displayName: 'Upload Artifact'
 
 - task: AzureWebApp@1
-
   inputs:
-    azureSubscription: '<Your Azure Subscription>'
-    appName: '<Your App Service Name>'
+    azureSubscription: 'StoneEvents-Back'
+    appName: 'webbingstone-nodejs'
     package: '$(Build.ArtifactStagingDirectory)/**/*.zip'
   displayName: 'Deploy to Azure WebApp'
