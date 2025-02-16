@@ -9,12 +9,16 @@ on:
       - master
   workflow_dispatch:
 
+env:
+  NODE_ENV: production
+  # Add any global environment variables here
+
 jobs:
   build:
     runs-on: ubuntu-latest
     permissions:
       contents: read #This is required for actions/checkout
-
+    
     steps:
       - uses: actions/checkout@v4
 
@@ -22,15 +26,29 @@ jobs:
         uses: actions/setup-node@v3
         with:
           node-version: '22.x'
+          cache: 'npm'  # Enable npm caching for faster builds
+
+      - name: Create env file
+        run: |
+          touch .env
+          echo "DATABASE_URL=${{ secrets.DATABASE_URL }}" >> .env
+          echo "JWT_SECRET=${{ secrets.JWT_SECRET }}" >> .env
+          echo "API_KEY=${{ secrets.API_KEY }}" >> .env
+          # Add other environment variables as needed
 
       - name: npm install, build, and test
         run: |
-          npm install
+          npm ci  # Use ci instead of install for cleaner, more reliable builds
           npm run build --if-present
           npm run test --if-present
+        env:
+          # Add any environment variables needed for build/test
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          API_KEY: ${{ secrets.API_KEY }}
 
       - name: Zip artifact for deployment
-        run: zip release.zip ./* -r
+        run: zip release.zip ./* .env -r  # Include .env file in the zip
 
       - name: Upload artifact for deployment job
         uses: actions/upload-artifact@v4
@@ -62,3 +80,32 @@ jobs:
           slot-name: 'Production'
           package: .
           publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_AD6BE47EE60E4DFAA8FE8C83B90E3A6E }}
+
+      - name: 'Configure Azure App Service Settings'
+        uses: azure/appservice-settings@v1
+        with:
+          app-name: 'webbingstone-nodejs'
+          slot-name: 'Production'
+          app-settings-json: |
+            [
+              {
+                "name": "DATABASE_URL",
+                "value": "${{ secrets.DATABASE_URL }}",
+                "slotSetting": false
+              },
+              {
+                "name": "JWT_SECRET",
+                "value": "${{ secrets.JWT_SECRET }}",
+                "slotSetting": false
+              },
+              {
+                "name": "API_KEY",
+                "value": "${{ secrets.API_KEY }}",
+                "slotSetting": false
+              },
+              {
+                "name": "NODE_ENV",
+                "value": "production",
+                "slotSetting": false
+              }
+            ]
