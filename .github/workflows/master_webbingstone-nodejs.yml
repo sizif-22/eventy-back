@@ -98,7 +98,8 @@ jobs:
           slot-name: 'Production'
           package: .
           publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_AD6BE47EE60E4DFAA8FE8C83B90E3A6E }}
-
+          startup-command: 'npm start'
+          
       - name: 'Configure Azure App Service Settings'
         uses: azure/appservice-settings@v1
         with:
