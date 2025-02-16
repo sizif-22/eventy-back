@@ -1,6 +1,5 @@
 # Docs for the Azure Web Apps Deploy action: https://github.com/Azure/webapps-deploy
 # More GitHub Actions for Azure: https://github.com/Azure/actions
-
 name: Build and deploy Node.js app to Azure Web App - webbingstone-nodejs
 
 on:
@@ -11,7 +10,6 @@ on:
 
 env:
   NODE_ENV: production
-  # Add any global environment variables here
 
 jobs:
   build:
@@ -26,29 +24,49 @@ jobs:
         uses: actions/setup-node@v3
         with:
           node-version: '22.x'
-          cache: 'npm'  # Enable npm caching for faster builds
+          cache: 'npm'
 
       - name: Create env file
         run: |
           touch .env
-          echo "DATABASE_URL=${{ secrets.DATABASE_URL }}" >> .env
-          echo "JWT_SECRET=${{ secrets.JWT_SECRET }}" >> .env
-          echo "API_KEY=${{ secrets.API_KEY }}" >> .env
-          # Add other environment variables as needed
+          # Firebase Configuration
+          echo "FIREBASE_API_KEY=${{ secrets.FIREBASE_API_KEY }}" >> .env
+          echo "FIREBASE_APP_ID=${{ secrets.FIREBASE_APP_ID }}" >> .env
+          echo "FIREBASE_AUTH_DOMAIN=${{ secrets.FIREBASE_AUTH_DOMAIN }}" >> .env
+          echo "FIREBASE_MEASUREMENT_ID=${{ secrets.FIREBASE_MEASUREMENT_ID }}" >> .env
+          echo "FIREBASE_MESSAGING_SENDER_ID=${{ secrets.FIREBASE_MESSAGING_SENDER_ID }}" >> .env
+          echo "FIREBASE_PROJECT_ID=${{ secrets.FIREBASE_PROJECT_ID }}" >> .env
+          # SMTP Configuration
+          echo "SMTP_HOST=${{ secrets.SMTP_HOST }}" >> .env
+          echo "SMTP_PASS=${{ secrets.SMTP_PASS }}" >> .env
+          echo "SMTP_PORT=${{ secrets.SMTP_PORT }}" >> .env
+          echo "SMTP_USER=${{ secrets.SMTP_USER }}" >> .env
+          # Other Configuration
+          echo "PORT=${{ secrets.PORT }}" >> .env
 
       - name: npm install, build, and test
         run: |
-          npm ci  # Use ci instead of install for cleaner, more reliable builds
+          npm ci
           npm run build --if-present
           npm run test --if-present
         env:
-          # Add any environment variables needed for build/test
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          JWT_SECRET: ${{ secrets.JWT_SECRET }}
-          API_KEY: ${{ secrets.API_KEY }}
+          # Firebase Environment Variables
+          FIREBASE_API_KEY: ${{ secrets.FIREBASE_API_KEY }}
+          FIREBASE_APP_ID: ${{ secrets.FIREBASE_APP_ID }}
+          FIREBASE_AUTH_DOMAIN: ${{ secrets.FIREBASE_AUTH_DOMAIN }}
+          FIREBASE_MEASUREMENT_ID: ${{ secrets.FIREBASE_MEASUREMENT_ID }}
+          FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.FIREBASE_MESSAGING_SENDER_ID }}
+          FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
+          # SMTP Environment Variables
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PASS: ${{ secrets.SMTP_PASS }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          # Other Environment Variables
+          PORT: ${{ secrets.PORT }}
 
       - name: Zip artifact for deployment
-        run: zip release.zip ./* .env -r  # Include .env file in the zip
+        run: zip release.zip ./* .env -r
 
       - name: Upload artifact for deployment job
         uses: actions/upload-artifact@v4
@@ -89,18 +107,58 @@ jobs:
           app-settings-json: |
             [
               {
-                "name": "DATABASE_URL",
-                "value": "${{ secrets.DATABASE_URL }}",
+                "name": "FIREBASE_API_KEY",
+                "value": "${{ secrets.FIREBASE_API_KEY }}",
                 "slotSetting": false
               },
               {
-                "name": "JWT_SECRET",
-                "value": "${{ secrets.JWT_SECRET }}",
+                "name": "FIREBASE_APP_ID",
+                "value": "${{ secrets.FIREBASE_APP_ID }}",
                 "slotSetting": false
               },
               {
-                "name": "API_KEY",
-                "value": "${{ secrets.API_KEY }}",
+                "name": "FIREBASE_AUTH_DOMAIN",
+                "value": "${{ secrets.FIREBASE_AUTH_DOMAIN }}",
+                "slotSetting": false
+              },
+              {
+                "name": "FIREBASE_MEASUREMENT_ID",
+                "value": "${{ secrets.FIREBASE_MEASUREMENT_ID }}",
+                "slotSetting": false
+              },
+              {
+                "name": "FIREBASE_MESSAGING_SENDER_ID",
+                "value": "${{ secrets.FIREBASE_MESSAGING_SENDER_ID }}",
+                "slotSetting": false
+              },
+              {
+                "name": "FIREBASE_PROJECT_ID",
+                "value": "${{ secrets.FIREBASE_PROJECT_ID }}",
+                "slotSetting": false
+              },
+              {
+                "name": "SMTP_HOST",
+                "value": "${{ secrets.SMTP_HOST }}",
+                "slotSetting": false
+              },
+              {
+                "name": "SMTP_PASS",
+                "value": "${{ secrets.SMTP_PASS }}",
+                "slotSetting": false
+              },
+              {
+                "name": "SMTP_PORT",
+                "value": "${{ secrets.SMTP_PORT }}",
+                "slotSetting": false
+              },
+              {
+                "name": "SMTP_USER",
+                "value": "${{ secrets.SMTP_USER }}",
+                "slotSetting": false
+              },
+              {
+                "name": "PORT",
+                "value": "${{ secrets.PORT }}",
                 "slotSetting": false
               },
               {
