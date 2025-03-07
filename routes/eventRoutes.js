@@ -9,7 +9,7 @@ const {
 const { updateEvent } = require("../services/eventService");
 
 // Define constants
-const TIMEZONE = process.env.TIMEZONE || 'Africa/Cairo';
+const TIMEZONE = process.env.TIMEZONE || "Africa/Cairo";
 const MAX_MESSAGE_LENGTH = 1000; // Example limit
 
 // Validation middleware
@@ -28,7 +28,7 @@ const validateEventRequest = (req, res, next) => {
     return res.status(400).json({
       error: "Message too long",
       maxLength: MAX_MESSAGE_LENGTH,
-      receivedLength: message.length
+      receivedLength: message.length,
     });
   }
 
@@ -119,6 +119,12 @@ router.post("/event", validateEventRequest, async (req, res) => {
       details: "Internal server error",
     });
   }
+});
+
+router.get("/test", (req, res) => {
+  res.status(200).json({
+    message: "it Works",
+  });
 });
 
 module.exports = router;
