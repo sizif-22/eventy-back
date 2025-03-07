@@ -7,7 +7,6 @@ const { loadUnsentMessages } = require("./services/messageService");
 console.log("env vars: ", process.env.PORT);
 console.log("env vars: ", process.env.PORT);
 console.log("env vars: ", process.env.PORT);
-console.log("env vars: ", process.env.PORT);
 
 const PORT = 3000;
 
