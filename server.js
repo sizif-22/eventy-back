@@ -2,11 +2,7 @@ const app = require("./app");
 const { TIMEZONE } = require("./utils/dateUtils");
 const { loadUnsentMessages } = require("./services/messageService");
 
-console.log("env vars: ", process.env.PORT);
-console.log("env vars: ", process.env.PORT);
-console.log("env vars: ", process.env.PORT);
-
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3030;
 // const PORT = 3000;
 
 const server = app.listen(PORT, () => {
