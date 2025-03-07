@@ -3,6 +3,12 @@ const { TIMEZONE } = require("./utils/dateUtils");
 const { loadUnsentMessages } = require("./services/messageService");
 
 // const PORT = process.env.PORT || 3000;
+
+console.log("env vars: ", process.env.PORT);
+console.log("env vars: ", process.env.PORT);
+console.log("env vars: ", process.env.PORT);
+console.log("env vars: ", process.env.PORT);
+
 const PORT = 3000;
 
 const server = app.listen(PORT, () => {
