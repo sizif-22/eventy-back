@@ -210,11 +210,17 @@ router.post(
 
         // Write participant data to Firestore
         const joinedAt = serverTimestamp();
-        const { nofparticipants } = (
-          await getDoc(doc(db, "events", eventId))
-        ).data();
-        nofparticipants += 1;
-        await updateDoc(doc(db, "events", eventId), { nofparticipants });
+        try {
+          let { nofparticipants } = (
+            await getDoc(doc(db, "events", eventId))
+          ).data();
+          console.warn("nofparticipants: ", nofparticipants);
+          nofparticipants += 1;
+          console.warn("nofparticipants: ", nofparticipants);
+          await updateDoc(doc(db, "events", eventId), { nofparticipants });
+        } catch (error) {
+          console.error("Error updating nofparticipants:", error);
+        }
         await setDoc(newParticipantRef, {
           joinedAt,
           attended: false,
